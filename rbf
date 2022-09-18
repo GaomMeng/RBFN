@@ -1,1 +1,68 @@
-GaomMeng/GM
+from sklearn.cluster import KMeans
+import matplotlib.pyplot as plt
+import numpy as np
+import random
+
+
+class RBFN:
+    def __init__(self, in_dim, hid_dim, out_dim):
+        self.in_dim = in_dim
+        self.out_dim = out_dim
+        self.hid_dim = hid_dim
+        self.centers = [np.random.uniform(-1, 1, in_dim) for _ in range(hid_dim)]
+        self.beta = None
+        self.W = np.random.random((self.hid_dim, self.out_dim))
+
+    def _calc_Gaussian(self, X):
+        # 计算高斯距离阵
+        Gaussian = np.zeros((X.shape[0], self.hid_dim), float)
+        for ci, c in enumerate(self.centers):
+            for xi, x in enumerate(X):
+                Gaussian[xi, ci] = np.exp(- self.beta * (np.linalg.norm(c - x) ** 2))
+        return Gaussian
+
+    def train(self, X, Y):
+        # K-means 选取中心
+        k_means = KMeans(init='k-means++', n_clusters=self.hid_dim, n_init=10)
+        k_means.fit(np.array(X))
+        self.centers = np.array(k_means.cluster_centers_)
+
+        # 计算 beta
+        c_max = np.max([np.linalg.norm(u - v) for u in self.centers for v in self.centers])
+        self.beta = self.hid_dim / (c_max ** 2)
+
+        # 计算高斯距离阵
+        Gaussian = self._calc_Gaussian(X)
+
+        # 计算权重
+        self.W = np.dot(np.linalg.pinv(Gaussian), Y)
+
+    def predict(self, X):
+        Gaussian = self._calc_Gaussian(X)
+        Y = np.dot(Gaussian, self.W)
+        return Y
+
+
+# 生成一组测试数据，用RBF拟合一个二次函数
+x = np.array([[float(i)]for i in range(100)])
+y = np.array([[float(i[0]**2) + 0.5 * random.random()]for i in x])
+
+# 生成8个中心的网， 训练，并预测
+rbf = RBFN(1, 8, 1)
+rbf.train(x, y)
+y_predict = rbf.predict(x)
+
+# 绘制图像
+x_plot = [xi[0] for xi in x]
+y_plot = [yi[0] for yi in y]
+
+plt.figure()
+plt.scatter(x_plot, y_plot, s=5, c='blue', marker='*', label=r"$Real$")
+plt.scatter(x_plot, y_predict, s=5, c='r', marker='.', label=r"$Predict$")
+plt.xlabel('x', fontsize=18)
+plt.ylabel('y', fontsize=18)
+plt.ylim(0, np.max(y_plot))
+plt.xlim(0, np.max(x_plot))
+plt.title(r'$RBF$', fontsize=18)
+plt.legend(loc="best")
+plt.show()
